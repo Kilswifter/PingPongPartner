@@ -32,6 +32,12 @@ int PWM_S1_HOME = 0;
 int PWM_S2_HOME = 0;
 int PWM_S3_HOME = 0;
 
+// snelheidssensor
+int Treshold = 850;
+int Distance = 0.05;
+unsigned long time_begin, time_end;
+float Snelheid, Timedifference;
+
 
 
 void setup() {
@@ -88,7 +94,7 @@ void loop() {
       // rechts voor
 
       break;
-    case 6 :
+    case 7 :
       // rechts achter
 
       break;
@@ -133,4 +139,33 @@ void servoSet(int servoPin, int servoAngle)
 {
   int valuePWM = map(servoAngle, -60, 60, 8, 37);
   SoftPWMSet(servoPin, valuePWM);
+}
+
+void speed()
+  // Meet de snelheid
+  Val = analogRead(PHOTO_PIN);
+
+  if (int(Val) > Treshold)
+  {
+    time_begin = millis();
+    while (int(Val) > Treshold)
+    {
+      val = analogRead(PHOTO_PIN);
+      delay(0.1);
+    }
+    while (int(Val) < Treshold)
+    {
+      Val = analogRead(PHOTO_PIN);
+      delay(0.1);
+    }
+    time_end = millis();
+    while (int(Val) > Treshold)
+    {
+      Val = analogRead(PHOTO_PIN);
+      delay(0.1);
+    }
+    Timedifference = float((time_end - time_begin)) ;
+    Snelheid = float( Distance/Timedifference) ;
+    Serial.println(Snelheid);
+
 }
