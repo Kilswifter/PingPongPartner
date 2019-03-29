@@ -1,16 +1,17 @@
 % Matlab programma ter voorspelling van de baan afgelegd door een
 % gelanceerde pinpongbal. 
 launchHight = 0.10;
-duration = 1.15;
-speed = 7;
+maxDistance = 1;
+maxHight = 0.5;
+speed = 2;
 angle = pi/4;
 
 % Tweede orde differentiaalvergelijking
-[t,y] = ode45(@vdp1,[0 duration],[0; launchHight; (speed*cos(angle)); (speed*sin(angle))]);
+[t,y] = ode45(@vdp1,[0 maxDistance],[0; launchHight; (speed*cos(angle)); (speed*sin(angle))]);
 plot(y(:,1),y(:,2),'-o')
 xlabel('Afstand[m]')
 ylabel('Hoogte[m]')
-axis([0 2.7 0 0.3])
+axis([0 maxDistance 0 maxDistance])
  
  
 function dydt = vdp1(t,y)
