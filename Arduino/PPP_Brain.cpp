@@ -49,6 +49,23 @@ void setup() {
 
 void loop() {
   // put your main code here, to run repeatedly:
+  switch (range)
+    case 0:
+      Serial.println("makkelijk");
+
+      break;
+    case 1:
+      Serial.println("normaal");
+
+      break;
+    case 2:
+      Serial.println("moeilijk");
+
+      break;  
+    case 3:
+      Serial.println("extreem");
+
+      break;
 
 }
 
