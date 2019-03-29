@@ -49,24 +49,51 @@ void setup() {
 
 void loop() {
   // put your main code here, to run repeatedly:
-  switch (range)
-    case 0:
-      Serial.println("makkelijk");
+  // De Gsm stuurt een waarde van 0 tot 7 naar de bluetooth module
 
-      break;
+  switch (DIFFICULTY)
+  {
+    case 0:
+    //tijd tussen ballen is het langst
+      Serial.println("makkelijk");
+      RELOAD_SPEED = 1
+
+      break ;
     case 1:
       Serial.println("normaal");
+      RELOAD_SPEED = 2
 
       break;
+
     case 2:
       Serial.println("moeilijk");
+      RELOAD_SPEED = 3
 
-      break;  
+      break;
     case 3:
       Serial.println("extreem");
+      // tijd tussen ballen is het kortst
+      RELOAD_SPEED = 4
+      break;
+
+    case 4 :
+      // links voor
+
+      break;
+    case 5 :
+      // links achter
+
+      break;
+    case 6 :
+      // rechts voor
+
+      break;
+    case 6 :
+      // rechts achter
 
       break;
 
+    }
 }
 
 
