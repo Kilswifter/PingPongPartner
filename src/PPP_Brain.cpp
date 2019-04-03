@@ -35,12 +35,18 @@ int PWM_S3_HOME = 0;
 int SERVOMIN = 8;
 int SERVOMAX = 37;
 
-int DIFFICULTY = 0;
-int RELOAD_SPEED = 10;
-
 int PHOTO_THRESHOLD = 850;  // triggerwaarde voor script
 int PHOTO_DISTANCE = 0.05;  // afstand tussen phototransistoren
 int PHOTO_DELAY = 0.1;  // delays voor stabiliteit
+
+// defenities voor profiles
+int profileArray[] = {1, 2, 3, 4};
+int ITEMS_PER_PROFILE = 1;
+int DIFFICULTY = 0;
+int RELOAD_SPEED = 10;
+int MAX_AMMOUNT_OF_BALLS = 10;
+int SERVO_SPEED = 400;
+
 
 // defenities voor placeholder variables
 unsigned long time_begin, time_end;
@@ -70,15 +76,36 @@ void loop() {
   while (bluetoothSerial.available())
   {
     delay(10);
-    char c = bluetoothSerial.read();
+    char c = bluetoothSerial.readStringUntil("\n");
     command += c; // voeg karakter c toe aan command string totdat alle verzonden karakters via bluetoothSerial opgeslagen zijn in command
   }
+
 
   if (command.length() > 0)
     // er werd een commando ontvangen!
   {
+
+    if (command.startsWith("SETRGB/"))
+    {
+      String number =  command.substring(command.indexOf("/") + 1); // splits het commando op na de / om de parameter in te lezen.
+      int R = int(number.substring(0, 2));
+      int G = int(number.substring(3, 6));
+      int B = int(number.substring(7, 10));
+      rgbSet(R, G, B);
+
+      bluetoothSerial.print(R);
+      bluetoothSerial.print(" ");
+      bluetoothSerial.print(G);
+      bluetoothSerial.print(" ");
+      bluetoothSerial.println(B);
+      delay(5);
+    }
+
     if (command.startsWith("SETDIFFICULTY/"))
-    {}
+    {
+      String value =  command.substring(command.indexOf("/") + 1); // splits het commando op na de / om de parameter in te lezen.
+      difSet(value);
+    }
   }
 
 
@@ -158,12 +185,65 @@ void hardwareSetup()
   Serial.println("    Preperation Done!");
 }
 
+void difSet(value)
+{
+  switch (value)
+  {
+    case 0:
+    //tijd tussen ballen is het langst
+      Serial.println("Difficulty set to [makkelijk]");
+      Serial.println("        RELOAD_SPEED = " + 1)
+      RELOAD_SPEED = 1;
 
+    case 1:
+      Serial.println("Difficulty set to [normaal]");
+      Serial.println("        RELOAD_SPEED = " + 2)
+      RELOAD_SPEED = 2;
+
+    case 2:
+      Serial.println("Difficulty set to [moeilijk]");
+      Serial.println("        RELOAD_SPEED = " + 3)
+      RELOAD_SPEED = 3;
+
+    case 3:
+      Serial.println("Difficulty set to [extreem]");
+      Serial.println("        RELOAD_SPEED = " + 4)
+      // tijd tussen ballen is het kortst
+      RELOAD_SPEED = 4;
+}
+
+void rgbSet(int R, int G, int B)
+{
+  Serial.println("Setting RGB values ...");
+  Serial.print("        R = " + R);
+  Serial.print(" G = " + G);
+  Serial.print(" B = " + B);
+
+  SoftPWMSet(RED_IN_PIN, R);
+  SoftPWMSet(GREEB_IN_PIN, G);
+  SoftPWMSet(BLUE_IN_PIN, B);
+  Serial.println("    Done!")
+}
 
 void servoSet(int servoPin, int servoAngle)
 {
+  Serial.println("Setting servo to angle ...");
+  Serial.println("        servoPin = " + servoPin);
+  Serial.print("        servoAngle = " + servoAngle);
+
   int valuePWM = map(servoAngle, -60, 60, 8, 37);
-  SoftPWMSet(servoPin, valuePWM);
+  Serial.print("        valuePWM = " + valuePWM);
+
+  if ((valuePWM <= SERVOMAX) && (valuePWM >= SERVOMIN))
+  {
+    SoftPWMSet(servoPin, valuePWM);
+    Serial.println("    Done!");
+  }
+  else
+  {
+    Serial.println("    ERR - " + servoPWM + " is geen geldige waarde voor een servomotor!");
+  }
+
 }
 
 
