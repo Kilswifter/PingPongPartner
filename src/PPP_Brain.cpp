@@ -6,7 +6,11 @@ AltSoftSerial bluetoothSerial; // de bluetoothconnectie (noem dit hoe je wil maa
 void hardwareSetup();
 void rgbSet(int R, int G, int B);
 void difSet(int value);
+void dirSet(int value);
+void Reload(String action);
+void Shoot();
 void servoSet(int servoPin, int servoAngle);
+void speed();
 
 
 // pin defenities voor digitale pinnen
@@ -31,6 +35,7 @@ int GREEN_IN_PIN = A5;
 
 // definities voor standaardwaarden
 int PWM_S1_HOME = 0;
+int PWM_S1_END = 10;
 int PWM_S2_HOME = 0;
 int PWM_S3_HOME = 0;
 
@@ -42,12 +47,19 @@ int PHOTO_DISTANCE = 0.05;  // afstand tussen phototransistoren
 int PHOTO_DELAY = 0.1;  // delays voor stabiliteit
 
 // defenities voor profiles
-int profileArray[] = {1, 2, 3, 4};
+int reloadProfile[] = {1, 2, 3, 4};
 int ITEMS_PER_PROFILE = 1;
 int DIFFICULTY = 0;
 int RELOAD_SPEED = 10;
 int MAX_AMMOUNT_OF_BALLS = 10;
-int SERVO_SPEED = 400;
+int CURRENT_AMMOUNT_OF_BALLS = 10;
+//int SERVO_SPEED = 400;
+int HOMEPOSX = 0;
+int HOMEPOSY = 0;
+int TARGETX = 0;
+int TARGETY = 0;
+int LEFTSPEED = 30;
+int RIGHTSPEED = 30;
 
 
 // defenities voor placeholder variables
@@ -58,16 +70,13 @@ String command;  // opslag voor bluetoothbericht
 
 void setup() {
   Serial.begin(9600);
-  Serial.print("Program started running!");
+  Serial.println("Program started running!");
 
   delay(1000);
 
   // configuring all settings for connected hardware
   hardwareSetup();
   delay(100);
-
-
-
 }
 
 
@@ -86,6 +95,8 @@ void loop() {
   if (command.length() > 0)
     // er werd een commando ontvangen!
   {
+    //Serial.println(command);
+    //bluetoothSerial.println(command);
 
     if (command.startsWith("SETRGB/"))
     {
@@ -114,6 +125,35 @@ void loop() {
       int value =  command.substring(command.indexOf("/") + 1).toInt(); // splits het commando op na de / om de parameter in te lezen.
       dirSet(value);
     }
+
+    if (command.startsWith("SETHOMELOCATION/"))
+    {
+      String value =  command.substring(command.indexOf("/") + 1); // splits het commando op na de / om de parameter in te lezen.
+      int X = (value.substring(0, 1)).toInt();
+      int Y = (value.substring(1, 2)).toInt();
+      HOMEPOSX = X;
+      HOMEPOSY = Y;
+    }
+
+    if (command.startsWith("SETTARGETLOCATION/"))
+    {
+      String value =  command.substring(command.indexOf("/") + 1); // splits het commando op na de / om de parameter in te lezen.
+      int X = (value.substring(0, 1)).toInt();
+      int Y = (value.substring(1, 2)).toInt();
+      TARGETX = X;
+      TARGETY = Y;
+    }
+
+    if (command.startsWith("RELOAD/"))
+    {
+      String action =  command.substring(command.indexOf("/") + 1); // splits het commando op na de / om de parameter in te lezen.
+      Reload(action);
+    }
+
+    if (command.startsWith("SHOOT/"))
+    {
+      Shoot();
+    }
   }
 
 
@@ -122,7 +162,7 @@ void loop() {
 
 void hardwareSetup()
 {
-  Serial.print("Starting with hardware preperation ...");
+  Serial.println("Starting with hardware preperation ...");
   delay(10);
 
   Serial.println("        Starting SoftPWM ...");
@@ -150,40 +190,110 @@ void hardwareSetup()
   Serial.println("    Preperation Done!");
 }
 
+void dirSet(int value)
+{
+  switch (value)
+  {
+    case 0:
+      Serial.println("linksachter");
+      SoftPWMSet(PWM_M1_PIN,37);//motoren activeren
+      SoftPWMSet(PWM_M2_PIN,37);
+      servoSet(PWM_S1_PIN,-30); //De richting naar links
+      servoSet(PWM_S2_PIN, 60); //Het balletje naar voor duwen
+      speed();
+      servoSet(PWM_S2_PIN,-60); // Nieuw balletje laten vallen
+      CURRENT_AMMOUNT_OF_BALLS -- ;
+
+    case 1:
+      Serial.println("rechtsachter");
+      SoftPWMSet(PWM_M1_PIN,37);//motoren activeren
+      SoftPWMSet(PWM_M2_PIN,37);
+      servoSet(PWM_S1_PIN,30); //De richting naar rechts
+      servoSet(PWM_S2_PIN, 60); //Het balletje naar voor duwen
+      speed();
+      servoSet(PWM_S2_PIN,-60); // Nieuw balletje laten vallen
+      CURRENT_AMMOUNT_OF_BALLS -- ;
+
+    case 2:
+      Serial.println("linksvoor");
+      SoftPWMSet(PWM_M1_PIN,20);//motoren activeren
+      SoftPWMSet(PWM_M2_PIN,20);
+      servoSet(PWM_S1_PIN,-30); //De richting naar links
+      servoSet(PWM_S2_PIN, 60); //Het balletje naar voor duwen
+      speed();
+      servoSet(PWM_S2_PIN,-60); // Nieuw balletje laten vallen
+      CURRENT_AMMOUNT_OF_BALLS -- ;
+
+    case 3:
+      Serial.println("rechtsvoor");
+      SoftPWMSet(PWM_M1_PIN,37);//motoren activeren
+      SoftPWMSet(PWM_M2_PIN,37);
+      servoSet(PWM_S1_PIN,30); //De richting naar rechts
+      servoSet(PWM_S2_PIN, 60); //Het balletje naar voor duwen
+      speed();
+      servoSet(PWM_S2_PIN,-60); // Nieuw balletje laten vallen
+      CURRENT_AMMOUNT_OF_BALLS -- ;
+
+  }
+}
+
 void difSet(int value)
 {
   switch (value)
   {
     case 0:
-    //tijd tussen ballen is het langst
       Serial.println("Difficulty set to [makkelijk]");
-      Serial.println("        RELOAD_SPEED = " + 1);
+      Serial.println("        RELOAD_SPEED = " );
       RELOAD_SPEED = 1;
+      while (CURRENT_AMMOUNT_OF_BALLS > 0) {
+        int Direction = random(0,3);
+        dirSet(Direction);
+        delay(20);
+      }
+
 
     case 1:
       Serial.println("Difficulty set to [normaal]");
       Serial.println("        RELOAD_SPEED = " + 2);
       RELOAD_SPEED = 2;
+      while (CURRENT_AMMOUNT_OF_BALLS > 0) {
+        int Direction = random(0,3);
+        dirSet(Direction);
+        delay(30);
+      }
 
     case 2:
       Serial.println("Difficulty set to [moeilijk]");
       Serial.println("        RELOAD_SPEED = " + 3);
       RELOAD_SPEED = 3;
+      while (CURRENT_AMMOUNT_OF_BALLS > 0) {
+        int Direction = random(0,3);
+        dirSet(Direction);
+        delay(40);
+      }
 
     case 3:
       Serial.println("Difficulty set to [extreem]");
       Serial.println("        RELOAD_SPEED = " + 4);
       // tijd tussen ballen is het kortst
       RELOAD_SPEED = 4;
+      while (CURRENT_AMMOUNT_OF_BALLS > 0) {
+        int Direction = random(0,3);
+        dirSet(Direction);
+        delay(50);
+      }
   }
 }
 
 void rgbSet(int R, int G, int B)
 {
   Serial.println("Setting RGB values ...");
-  Serial.print("        R = " + R);
-  Serial.print(" G = " + G);
-  Serial.print(" B = " + B);
+  Serial.print("        R = ");
+  Serial.println(R);
+  Serial.print(" G = ");
+  Serial.println(G);
+  Serial.print(" B = ");
+  Serial.println(B);
 
   SoftPWMSet(RED_IN_PIN, R);
   SoftPWMSet(GREEN_IN_PIN, G);
@@ -191,14 +301,40 @@ void rgbSet(int R, int G, int B)
   Serial.println("    Done!");
 }
 
+void Reload(String action)
+{
+  Serial.print("Reload ...");
+
+  if (action == "OPEN")
+  {
+    Serial.println("        Open");
+    servoSet(PWM_S1_PIN, PWM_S1_HOME);
+  }
+  if (action == "CLOSE")
+  {
+    Serial.println("        Close");
+    servoSet(PWM_S1_PIN, PWM_S1_END);
+  }
+}
+
+void Shoot()
+{
+  Reload("OPEN");
+  delay(1000);
+  Reload("CLOSE");
+}
+
 void servoSet(int servoPin, int servoAngle)
 {
   Serial.println("Setting servo to angle ...");
-  Serial.println("        servoPin = " + servoPin);
-  Serial.print("        servoAngle = " + servoAngle);
+  Serial.print("        servoPin = ");
+  Serial.println(servoPin);
+  Serial.print("        servoAngle = ");
+  Serial.println(servoAngle);
 
   int valuePWM = map(servoAngle, -60, 60, 8, 37);
-  Serial.print("        valuePWM = " + valuePWM);
+  Serial.print("        valuePWM = ");
+  Serial.println(valuePWM);
 
   if ((valuePWM <= SERVOMAX) && (valuePWM >= SERVOMIN))
   {
@@ -211,36 +347,64 @@ void servoSet(int servoPin, int servoAngle)
     Serial.print(valuePWM);
     Serial.print(" is geen geldige waarde voor een servomotor!");
   }
-
 }
 
+void motorSet()
+{
+  Serial.println("Running DC-motors up to speed ...");
+  Serial.print("        Left motor: ");
+  Serial.println(LEFTSPEED);
+  Serial.print("        Right motor: ");
+  Serial.println(RIGHTSPEED);
+  SoftPWMSet(PWM_S1_PIN, LEFTSPEED);
+  SoftPWMSet(PWM_S2_PIN, RIGHTSPEED);
+  Serial.println("    Done!");
+
+}
 
 void speed()
 {
   // Meet de snelheid
   int photoVal = analogRead(PHOTO_PIN);
+  int timeout_1 = millis();
+  int timeout_2 = millis();
+  while (timeout_2-timeout_1<3000) {
 
-  if (int(photoVal) > PHOTO_THRESHOLD)
-  {
-    time_begin = millis();
-    while (int(photoVal) > PHOTO_THRESHOLD)
+    if (int(photoVal) > PHOTO_THRESHOLD)
     {
-      photoVal = analogRead(PHOTO_PIN);
-      delay(PHOTO_DELAY);
+      time_begin = millis();
+      while (int(photoVal) > PHOTO_THRESHOLD)
+      {
+        int timeout_2 = millis();
+        photoVal = analogRead(PHOTO_PIN);
+        delay(PHOTO_DELAY);
+        if (timeout_2-timeout_1>3000);
+          break;
+      }
+
+      while (int(photoVal) < PHOTO_THRESHOLD)
+      {
+        int timeout_2 = millis();
+        photoVal = analogRead(PHOTO_PIN);
+        delay(PHOTO_DELAY);
+        if (timeout_2-timeout_1>3000);
+          break;
+      }
+
+      time_end = millis();
+      while (int(photoVal) > PHOTO_THRESHOLD)
+      {
+        int timeout_2 = millis();
+        photoVal = analogRead(PHOTO_PIN);
+        delay(PHOTO_DELAY);
+        if (timeout_2-timeout_1>3000);
+          break;
+      }
+      time_difference = float( time_end - time_begin ) ;
+      snelheid = float( PHOTO_DISTANCE/time_difference ) ;
+      Serial.println(snelheid);
+      break;
     }
-    while (int(photoVal) < PHOTO_THRESHOLD)
-    {
-      photoVal = analogRead(PHOTO_PIN);
-      delay(PHOTO_DELAY);
-    }
-    time_end = millis();
-    while (int(photoVal) > PHOTO_THRESHOLD)
-    {
-      photoVal = analogRead(PHOTO_PIN);
-      delay(PHOTO_DELAY);
-    }
-    time_difference = float( time_end - time_begin ) ;
-    snelheid = float( PHOTO_DISTANCE/time_difference ) ;
-    Serial.println(snelheid);
+    timeout_2 = millis();
   }
 }
