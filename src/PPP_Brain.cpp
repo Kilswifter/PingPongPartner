@@ -105,7 +105,7 @@ void loop() {
 
     if (command.startsWith("SETDIFFICULTY/"))
     {
-      String value =  command.substring(command.indexOf("/") + 1); // splits het commando op na de / om de parameter in te lezen.
+      int value =  command.substring(command.indexOf("/") + 1).toInt(); // splits het commando op na de / om de parameter in te lezen.
       difSet(value);
     }
   }
