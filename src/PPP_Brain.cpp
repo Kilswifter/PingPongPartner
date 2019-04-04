@@ -108,52 +108,15 @@ void loop() {
       int value =  command.substring(command.indexOf("/") + 1).toInt(); // splits het commando op na de / om de parameter in te lezen.
       difSet(value);
     }
+
+    if (command.startsWith("SETDIRECTION/"))
+    {
+      int value =  command.substring(command.indexOf("/") + 1).toInt(); // splits het commando op na de / om de parameter in te lezen.
+      dirSet(value);
+    }
   }
 
 
-  // De Gsm stuurt een waarde van 0 tot 7 naar de bluetooth module
-
-
-
-
-  switch (DIFFICULTY)
-  {
-    case 0:
-    //tijd tussen ballen is het langst
-      Serial.println("makkelijk");
-      RELOAD_SPEED = 1;
-
-    case 1:
-      Serial.println("normaal");
-      RELOAD_SPEED = 2;
-
-    case 2:
-      Serial.println("moeilijk");
-      RELOAD_SPEED = 3;
-
-    case 3:
-      Serial.println("extreem");
-      // tijd tussen ballen is het kortst
-      RELOAD_SPEED = 4;
-
-    case 4 :
-      // links voor
-
-      break;
-    case 5 :
-      // links achter
-
-      break;
-    case 6 :
-      // rechts voor
-
-      break;
-    case 7 :
-      // rechts achter
-
-      break;
-
-    }
 }
 
 
