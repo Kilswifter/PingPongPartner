@@ -207,9 +207,9 @@ void servoSet(int servoPin, int servoAngle)
   }
   else
   {
-    Serial.print("    ERR - ")
-    Serial.print(valuePWM)
-      + " is geen geldige waarde voor een servomotor!");
+    Serial.print("    ERR - ");
+    Serial.print(valuePWM);
+    Serial.print(" is geen geldige waarde voor een servomotor!");
   }
 
 }
