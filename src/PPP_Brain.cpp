@@ -1,3 +1,13 @@
+/**
+  Besturingssoftware Pingpongpartner
+  Naam: PPP_Brain.cpp
+  Purpose: Aansturing van elektronische pingpongpartner op basis van te
+           ontvangen bluetooth commando's.
+
+  @authors Ben Mechelmans, Thomas Sergeys
+  @version 1.0 6/04/2019
+*/
+
 #include <PWMSoft.h>
 #include <SoftPWM_timer.h>
 #include <AltSoftSerial.h>
@@ -237,6 +247,18 @@ void dirSet(int value)
   }
 }
 
+/**
+  Functie bedoeld om de moeilijkheidsgraad van de PPP aan te passen.
+  Verandert globale variabelen zoals snelheid en willekeurigheidsgraad naargelang
+  meegegeven moeilijkheidswaarde.
+
+  @param value moeilijkheidswaarde
+    0 = [makkelijk]
+    1 = [normaal]
+    2 = [moeilijk]
+    3 = [extreem]
+  @return None
+*/
 void difSet(int value)
 {
   switch (value)
@@ -285,6 +307,14 @@ void difSet(int value)
   }
 }
 
+/**
+  Functie om verbonden RGB-LED van kleur te veranderen
+
+  @param R roodwaarde [0-1023]
+  @param G groenwaarde [0-1023]
+  @param B blauwwaarde [0-1023]
+  @return None
+*/
 void rgbSet(int R, int G, int B)
 {
   Serial.println("Setting RGB values ...");
@@ -301,6 +331,15 @@ void rgbSet(int R, int G, int B)
   Serial.println("    Done!");
 }
 
+/**
+  Functie ter bediening van laadarm om de pingpong ballen tussen de DC motoren
+    te duwen
+
+  @param action opdracht voor laadarm
+    "OPEN" - opent laadmechanisme
+    "CLOSE" - sluit laadmechanisme & duwt bal tussen DC motoren
+  @return None
+*/
 void Reload(String action)
 {
   Serial.print("Reload ...");
@@ -317,6 +356,12 @@ void Reload(String action)
   }
 }
 
+/**
+  Pipeline functie voor het afschieten van een pingpong bal. Opent en sluit
+    achtereenvolgens het laadmechanisme
+
+  @return None
+*/
 void Shoot()
 {
   Reload("OPEN");
@@ -349,6 +394,11 @@ void servoSet(int servoPin, int servoAngle)
   }
 }
 
+/**
+  Functie om globale snelheidswaarde toe te passen op de DC motoren.
+
+  @return None
+*/
 void motorSet()
 {
   Serial.println("Running DC-motors up to speed ...");
@@ -362,6 +412,11 @@ void motorSet()
 
 }
 
+/**
+  Functie om de snelheid van een afgeschoten pingpong bal te berekenen.
+
+  @return snelheid
+*/
 void speed()
 {
   // Meet de snelheid
@@ -403,7 +458,7 @@ void speed()
       time_difference = float( time_end - time_begin ) ;
       snelheid = float( PHOTO_DISTANCE/time_difference ) ;
       Serial.println(snelheid);
-      break;
+      return snelheid
     }
     timeout_2 = millis();
   }
