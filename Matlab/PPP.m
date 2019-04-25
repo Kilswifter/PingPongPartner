@@ -12,6 +12,30 @@ plot(y(:,1),y(:,2),'-o')
 xlabel('Afstand[m]')
 ylabel('Hoogte[m]')
 axis([0 maxDistance 0 maxDistance])
+
+
+syms vx(x) vy(y) rho m A Cw g
+
+ax = diff(vx);
+ay = diff(vy);
+
+odex = m*ax == 0.5*rho*vx*A*Cw;
+odey = m*ay == 0.5*rho*vy*A*Cw - m*g;
+
+
+
+solx = dsolve(odex)
+soly = dsolve(odey)
+
+x = 0;
+y = launchHight;
+vglx = subs(solx)
+vgly = subs(soly)
+
+
+
+
+
  
  
 function dydt = vdp1(t,y)
@@ -28,3 +52,15 @@ dydt= [(y(3));
     (((-1/2 * rho * surface * Cw)/ m)*(y(3)*sqrt(y(3)^2 + y(4)^2)));
     (((-1/2 * rho * surface * Cw)/ m)*(y(4)*sqrt(y(3)^2 + y(4)^2)) - g)];
 end
+
+
+
+
+
+
+
+
+
+
+
+
