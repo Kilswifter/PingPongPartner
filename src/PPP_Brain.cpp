@@ -29,16 +29,18 @@ AltSoftSerial bluetoothSerial; // de bluetoothconnectie (noem dit hoe je wil maa
 // placeholders voor later gedefinieerde functies
 void hardwareSetup();
 void rgbSet(int R, int G, int B);
+void gradientSet();
 void ledSet(String color, int value);
 void difSet(int value);
 void Reload(String action);
-void shoot(int speed, int angle);
-void servoSet(int servoPin, int servoAngle);
+void aim(float speed, float angle);
+void shoot(float speed, float angle);
+void servoSet(int servoPin, float servoAngle);
 void motorSet();
 float speed();
-void calTraj(int speed, int angle);
-float calAnglefromSpeed(int distance, int speed);
-float calSpeedfromAngle(int distance, int angle);
+void calTraj(float speed, float angle);
+float calAnglefromSpeed(float distance, float speed);
+float calSpeedfromAngle(float distance, float angle);
 void calibration();
 String getValue(String data, char separator, int index);
 
@@ -69,8 +71,8 @@ int RELOAD_START = 0;
 int RELOAD_END = 10;
 
 int ROTATION_HOME = 0;
-int ROATION_START = -5;
-int ROTATION_END = 5;
+int ROATION_START = -10;
+int ROTATION_END = 10;
 
 int ELEVATION_HOME = 0;
 int ELEVATION_START = -5;
@@ -92,9 +94,9 @@ float HOMEPOSX[] = {0, 0, 0};  // {current, min, max}
 float HOMEPOSY[] = {0, 0, 0};  // {current, min, max}
 float TARGETX[] = {0, 0, 0};  // {current, min, max}
 float TARGETY[] = {2.6, 2.6, 2.6};  // {current, min, max}
-int LEFTSPEED = 2;  // [m/s]
-int RIGHTSPEED = 2;
-int SPINPERCENTAGE = 0;
+float LEFTSPEED = 2;  // [m/s]
+float RIGHTSPEED = 2;
+float SPINPERCENTAGE[] = {0, 0, 0};  // {current, min, max}
 
 // defenities voor placeholder variables
 String command;  // opslag voor bluetoothbericht
@@ -241,8 +243,8 @@ void loop()
     //          value between -1 and 1 (left and right)
     if (command.startsWith("SETSPIN/"))
     {
-      int value =  command.substring(command.indexOf("/") + 1).toInt(); // splits het commando op na de / om de parameter in te lezen.
-      SPINPERCENTAGE = value;
+      float value =  command.substring(command.indexOf("/") + 1).toFloat(); // splits het commando op na de / om de parameter in te lezen.
+      SPINPERCENTAGE[0] = value;
     }
 
     // endpoint for setting the maximum amount of available balls after a fresch reload
@@ -262,8 +264,8 @@ void loop()
     if (command.startsWith("SETHOMEPOS/"))
     {
       String value =  command.substring(command.indexOf("/") + 1); // splits het commando op na de / om de parameter in te lezen.
-      HOMEPOSX[0] = getValue(value, ';', 0).toInt();
-      HOMEPOSY[0] = getValue(value, ';', 1).toInt();
+      HOMEPOSX[0] = getValue(value, ';', 0).toFloat();
+      HOMEPOSY[0] = getValue(value, ';', 1).toFloat();
     }
 
     // endpoint for setting target position for the ball to hit
@@ -273,8 +275,8 @@ void loop()
     if (command.startsWith("SETTARGETPOS/"))
     {
       String value =  command.substring(command.indexOf("/") + 1); // splits het commando op na de / om de parameter in te lezen.
-      TARGETX[0] = getValue(value, ';', 0).toInt();
-      TARGETY[0] = getValue(value, ';', 1).toInt();
+      TARGETX[0] = getValue(value, ';', 0).toFloat();
+      TARGETY[0] = getValue(value, ';', 1).toFloat();
     }
 
     // endpoint for calculating the recuired ball trajectory to hit the target
@@ -297,6 +299,13 @@ void loop()
     {
       String action =  command.substring(command.indexOf("/") + 1); // splits het commando op na de / om de parameter in te lezen.
       Reload(action);
+    }
+
+    // endpoint for aiming the PPP at target location
+    //  input : AIM/
+    if (command.startsWith("AIM/"))
+    {
+      aim(-1000, 30);
     }
 
     // endpoint for shooting one projectile (used for testing purposes)
@@ -362,6 +371,7 @@ void loop()
   {
     if (CURRENT_AMMOUNT_OF_BALLS != 0)
     {
+      gradientSet();
       //HOMEPOSX[0] = random(HOMEPOSX[1], HOMEPOSX[2]);  // not used -> PPP unable to move
       //HOMEPOSY[0] = random(HOMEPOSY[1], HOMEPOSY[2]);
 
@@ -462,6 +472,8 @@ void difSet(int value)
     TARGETX[2] = 0;  // right
     TARGETY[1] = 2.6;  // down
     TARGETY[2] = 2.6;  // up
+    SPINPERCENTAGE[1] = 0;  // min
+    SPINPERCENTAGE[2] = 0;  // max
   }
 
   if (value == 1)
@@ -475,6 +487,8 @@ void difSet(int value)
     TARGETX[2] = 0;  // right
     TARGETY[1] = 2;  // down
     TARGETY[2] = 2.6;  // up
+    SPINPERCENTAGE[1] = 0;  // min
+    SPINPERCENTAGE[2] = 0;  // max
   }
 
   if (value == 2)
@@ -488,6 +502,8 @@ void difSet(int value)
     TARGETX[2] = 80;  // right
     TARGETY[1] = 2;  // down
     TARGETY[2] = 2.6;  // up
+    SPINPERCENTAGE[1] = 0;  // min
+    SPINPERCENTAGE[2] = 0;  // max
   }
 
   if (value == 3)
@@ -501,6 +517,8 @@ void difSet(int value)
     TARGETX[2] = 80;  // right
     TARGETY[1] = 2;  // down
     TARGETY[2] = 2.6;  // up
+    SPINPERCENTAGE[1] = -0.2;  // min
+    SPINPERCENTAGE[2] = 0.2;  // max
   }
 }
 
@@ -536,6 +554,12 @@ void rgbSet(int R, int G, int B)
   Serial.println(F("    Done!"));
 }
 
+void gradientSet()
+{
+  float greenValue = 220 + (float(CURRENT_AMMOUNT_OF_BALLS)/float(MAX_AMMOUNT_OF_BALLS))*30;
+  float redValue = 180 + (1-float(CURRENT_AMMOUNT_OF_BALLS)/float(MAX_AMMOUNT_OF_BALLS))*70;
+  rgbSet(redValue, greenValue, 0);
+}
 
 
 /**
@@ -592,13 +616,13 @@ void Reload(String action)
   }
 }
 
+
 /**
-  Pipeline functie voor het afschieten van een pingpong bal. Opent en sluit
-    achtereenvolgens het laadmechanisme
+  Functie om PPP volledig te richten.
 
   @return None
 */
-void shoot(int speed, int angle)
+void aim(float speed, float angle)
 {
   // defining all needed parameters of trajectory
   calTraj(speed, angle);
@@ -609,8 +633,19 @@ void shoot(int speed, int angle)
   // moving in position
   servoSet(ELEVATION_PIN, elevation_angle);
   servoSet(ROTATION_PIN, rotation_angle);
-  LEFTSPEED = (1+SPINPERCENTAGE)*motor_speed;
-  RIGHTSPEED = (1-SPINPERCENTAGE)*motor_speed;
+  LEFTSPEED = (1 + SPINPERCENTAGE[0])*motor_speed;
+  RIGHTSPEED = (1 - SPINPERCENTAGE[0])*motor_speed;
+}
+
+/**
+  Pipeline functie voor het afschieten van een pingpong bal. Opent en sluit
+    achtereenvolgens het laadmechanisme
+
+  @return None
+*/
+void shoot(float speed, float angle)
+{
+  aim(speed, angle);
   motorSet();
 
   Reload("OPEN");
@@ -638,7 +673,7 @@ void shoot(int speed, int angle)
 
   @return None
 */
-void servoSet(int servoPin, int servoAngle)
+void servoSet(int servoPin, float servoAngle)
 {
   Serial.println(F("Setting servo to angle ..."));
   Serial.print(F("        servoPin = "));
@@ -646,7 +681,7 @@ void servoSet(int servoPin, int servoAngle)
   Serial.print(F("        servoAngle = "));
   Serial.println(servoAngle);
 
-  int valuePWM = map(servoAngle, -60, 60, 8, 37);
+  float valuePWM = map(servoAngle, -60, 60, 8, 37);
   Serial.print(F("        valuePWM = "));
   Serial.println(valuePWM);
 
@@ -741,15 +776,15 @@ float speed()
     -1000 -> onbepaald
   @return None
 */
-void calTraj(int speed, int elevation_angle)
+void calTraj(float speed, float elevation_angle)
 {
   Serial.println(F("Calculating ball trajectory ..."));
 
   // calculating geometrie
-  float deltaX = TARGETX[0] - int(HOMEPOSX[0]);
-  float deltaY = TARGETY[0] - int(HOMEPOSY[0]);
+  float deltaX = TARGETX[0] - (HOMEPOSX[0]);
+  float deltaY = TARGETY[0] - (HOMEPOSY[0]);
   float distance = sqrt(pow(deltaX,2) + pow(deltaY,2));
-  float rotation_angle = atan(deltaY / deltaX);
+  float rotation_angle = atan(deltaX / deltaY)*180/3.1415;
 
   // printing given information
   Serial.print(F("        speed : "));
@@ -795,13 +830,13 @@ void calTraj(int speed, int elevation_angle)
   trajArray[2] = new_speed;
 }
 
-float calAnglefromSpeed(int distance, int speed)
+float calAnglefromSpeed(float distance, float speed)
 {
-  float new_angle = (57.29577951*acos((0.9449649771*distance)/speed));
+  float new_angle = (57.29577951*acos((0.9449649771*distance)/speed))*180/3.1415;
   return new_angle;
 }
 
-float calSpeedfromAngle(int distance, int angle)
+float calSpeedfromAngle(float distance, float angle)
 {
   float new_speed = ((0.9449649771*distance)/cos(angle));
   return new_speed;
