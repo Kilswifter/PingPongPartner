@@ -66,24 +66,24 @@ int PHOTO_PIN = A5;
 int GREEN_IN_PIN = A0;
 
 // definities voor standaardwaarden
-int RELOAD_HOME = 0;
-int RELOAD_START = 0;
-int RELOAD_END = 10;
+int RELOAD_HOME = 20;
+int RELOAD_START = 30;
+int RELOAD_END = -30;
 
 int ROTATION_HOME = 0;
-int ROATION_START = -10;
+int ROTATION_START = -10;
 int ROTATION_END = 10;
 
 int ELEVATION_HOME = 0;
-int ELEVATION_START = -5;
-int ELEVATION_END = 5;
+int ELEVATION_START = -10;
+int ELEVATION_END = 10;
 
 int PHOTO_THRESHOLD = 850;  // triggerwaarde voor script
 int PHOTO_DISTANCE = 0.05;  // afstand tussen phototransistoren
 int PHOTO_DELAY = 0.1;  // delays voor stabiliteit
 
 float WHEELRADIUS = 0.01;  // straal van lanceerwielen [m]
-int SPEEDFACTOR = 60/(2*WHEELRADIUS*3.1415);  // overgang van [m/s] naar [rmp]
+int SPEEDFACTOR = 1023;//10000*60/(2*WHEELRADIUS*3.1415);  // overgang van [m/s] naar [rmp]
 
 // defenities voor profiles
 int DIFFICULTY = 0;
@@ -102,7 +102,7 @@ float SPINPERCENTAGE[] = {0, 0, 0};  // {current, min, max}
 String command;  // opslag voor bluetoothbericht
 float trajArray[3];  // opslag van berekende baan [elevation, rotation, speed]
 bool fireFlag = false;  // controls fire protocol
-
+bool TOGGLEMODE = true;  // toggle switch voor speed ifv angle of angle ifv speed
 
 void setup()
 {
@@ -238,6 +238,15 @@ void loop()
       RIGHTSPEED = value;
     }
 
+    if (command.startsWith("SETSPEED/"))
+    {
+      int value =  command.substring(command.indexOf("/") + 1).toInt(); // splits het commando op na de / om de parameter in te lezen.
+      RIGHTSPEED = value;
+      LEFTSPEED = value;
+      motorSet();
+    }
+
+
     // endpoint for setting spin percentage
     //  input : SETSPIN/
     //          value between -1 and 1 (left and right)
@@ -312,11 +321,18 @@ void loop()
     //  input : SHOOT/
     if (command.startsWith("SHOOT/"))
     {
-      shoot(-1000, 30);
+      if (TOGGLEMODE)
+      {
+        shoot(-1000, 12);
+      }
+      else
+      {
+        shoot(5, -1000);
+      }
     }
 
     // endpoint for resetting amount of balls (drum gets reloaded)
-    //  input : SHOOT/
+    //  input : BALLS/
     if (command.startsWith("BALLS/"))
     {
       CURRENT_AMMOUNT_OF_BALLS = MAX_AMMOUNT_OF_BALLS;
@@ -339,6 +355,23 @@ void loop()
       Serial.println("]");
     }
 
+    // endpoint for switching mode for speed-angle or angle-speed
+    //  input : TOGGLEMODE/
+    if (command.startsWith("TOGGLEMODE/"))
+    {
+      if (TOGGLEMODE == true)
+      {
+        TOGGLEMODE = false;
+        bluetoothSerial.println(0);
+
+      }
+      TOGGLEMODE = true;
+      bluetoothSerial.println(1);
+
+      Serial.print(F("Switched mode to "));
+      Serial.println(TOGGLEMODE);
+    }
+
     // endpoint for testing mechanical limits
     //  input : CALIBRATE/
     if (command.startsWith("CALIBRATE/"))
@@ -348,7 +381,7 @@ void loop()
 
     if (command.startsWith("GETENDSTOPS/"))
     {
-      String endstops = String(ROATION_START) + "," +  String(ROTATION_HOME) + "," + String(ROTATION_END) + ","
+      String endstops = String(ROTATION_START) + "," +  String(ROTATION_HOME) + "," + String(ROTATION_END) + ","
                 + String(ELEVATION_START) + "," + String(ELEVATION_HOME) + "," + String(ELEVATION_END) + ","
                 + String(RELOAD_START) + "," + String(RELOAD_HOME) + "," + String(RELOAD_END);
       Serial.println(endstops);
@@ -382,7 +415,15 @@ void loop()
       RELOAD_SPEED[0] = random(RELOAD_SPEED[1], RELOAD_SPEED[2]);
 
       // shoot ball at 45° angle
-      shoot(-1000, 45);
+      if (TOGGLEMODE)
+      {
+        shoot(-1000, 12);
+      }
+
+      else
+      {
+        shoot(5, -1000);
+      }
 
       CURRENT_AMMOUNT_OF_BALLS --;
       Serial.print(F("Balls remaining : "));
@@ -607,12 +648,12 @@ void Reload(String action)
   if (action == "OPEN")
   {
     Serial.println(F("        Open"));
-    servoSet(RELOAD_PIN, RELOAD_START);
+    servoSet(RELOAD_PIN, RELOAD_END);
   }
   if (action == "CLOSE")
   {
     Serial.println(F("        Close"));
-    servoSet(RELOAD_PIN, RELOAD_END);
+    servoSet(RELOAD_PIN, RELOAD_START);
   }
 }
 
@@ -631,7 +672,7 @@ void aim(float speed, float angle)
   float motor_speed = trajArray[2];
 
   // moving in position
-  servoSet(ELEVATION_PIN, elevation_angle);
+  servoSet(ELEVATION_PIN, -elevation_angle);
   servoSet(ROTATION_PIN, rotation_angle);
   LEFTSPEED = (1 + SPINPERCENTAGE[0])*motor_speed;
   RIGHTSPEED = (1 - SPINPERCENTAGE[0])*motor_speed;
@@ -647,6 +688,7 @@ void shoot(float speed, float angle)
 {
   aim(speed, angle);
   motorSet();
+  delay(500);
 
   Reload("OPEN");
   Serial.print(F("Reload Delay = "));
@@ -659,9 +701,9 @@ void shoot(float speed, float angle)
   delay(1000);
 
   // stopping motors
-  LEFTSPEED = 0;
-  RIGHTSPEED = 0;
-  motorSet();
+  //LEFTSPEED = 0;
+  //RIGHTSPEED = 0;
+  //motorSet();
 }
 
 /**
@@ -859,18 +901,20 @@ void calibration()
   servoSet(RELOAD_PIN, RELOAD_END);
   delay(1000);
   servoSet(RELOAD_PIN, RELOAD_HOME);
+  delay(1000);
+  servoSet(RELOAD_PIN, RELOAD_START);
   delay(2000);
 
   Serial.println(F("--> moving servo 2 between end positions..."));
   servoSet(ROTATION_PIN, ROTATION_END);
   delay(1000);
-  servoSet(ROTATION_PIN, ROTATION_HOME);
+  servoSet(ROTATION_PIN, ROTATION_START);
   delay(2000);
 
   Serial.println(F("--> moving servo 3 between end positions..."));
   servoSet(ELEVATION_PIN, ELEVATION_END);
   delay(1000);
-  servoSet(ELEVATION_PIN, ELEVATION_HOME);
+  servoSet(ELEVATION_PIN, ELEVATION_START);
   delay(2000);
 
   Serial.println(F("--> getting motor 1 up to spead ..."));
