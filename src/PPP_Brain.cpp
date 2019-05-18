@@ -8,15 +8,6 @@
   @version 1.0 6/04/2019
 */
 
-/**
-  Verloop van Aansturing
-    - Instellen van aantal ballen (standaard 10)
-    - Instellen van Home positie (standaard [0, 0])
-    - Instellen van
-
-
-
-*/
 
 // benodigde software libraries
 #include <PWMSoft.h>
@@ -35,6 +26,8 @@ void difSet(int value);
 void Reload(String action);
 void aim(float speed, float angle);
 void shoot(float speed, float angle);
+void speedMeasure();
+void sendDetails();
 void servoSet(int servoPin, float servoAngle);
 void motorSet();
 float speed();
@@ -46,7 +39,8 @@ String getValue(String data, char separator, int index);
 
 
 // pin defenities voor digitale pinnen
-int PWM_M34_PIN = 2;
+//int PWM_M34_PIN = 2;
+int interruptPin = 2;
 int RELOAD_PIN = 3;
 int DIRECTION_SWITCH_PIN = 4;
 int ROTATION_PIN = 5;
@@ -67,7 +61,7 @@ int GREEN_IN_PIN = A0;
 
 // definities voor standaardwaarden
 int RELOAD_HOME = 20;
-int RELOAD_START = 30;
+int RELOAD_START = 20;
 int RELOAD_END = -30;
 
 int ROTATION_HOME = 0;
@@ -75,15 +69,15 @@ int ROTATION_START = -10;
 int ROTATION_END = 10;
 
 int ELEVATION_HOME = 0;
-int ELEVATION_START = -10;
-int ELEVATION_END = 10;
+int ELEVATION_START = -12;
+int ELEVATION_END = 12;
 
 int PHOTO_THRESHOLD = 850;  // triggerwaarde voor script
 int PHOTO_DISTANCE = 0.05;  // afstand tussen phototransistoren
 int PHOTO_DELAY = 0.1;  // delays voor stabiliteit
 
 float WHEELRADIUS = 0.01;  // straal van lanceerwielen [m]
-int SPEEDFACTOR = 1023;//10000*60/(2*WHEELRADIUS*3.1415);  // overgang van [m/s] naar [rmp]
+float SPEEDFACTOR = 60/((2*WHEELRADIUS*3.1415)*90);  // overgang van [m/s] naar [rmp]
 
 // defenities voor profiles
 int DIFFICULTY = 0;
@@ -103,6 +97,7 @@ String command;  // opslag voor bluetoothbericht
 float trajArray[3];  // opslag van berekende baan [elevation, rotation, speed]
 bool fireFlag = false;  // controls fire protocol
 bool TOGGLEMODE = true;  // toggle switch voor speed ifv angle of angle ifv speed
+volatile float MEASUREDSPEED = 0.0;
 
 void setup()
 {
@@ -113,6 +108,7 @@ void setup()
 
   // configuring all settings for connected hardware
   hardwareSetup();
+  //attachInterrupt(digitalPinToInterrupt(interruptPin), speedMeasure, HIGH);
   delay(100);
 }
 
@@ -238,9 +234,13 @@ void loop()
       RIGHTSPEED = value;
     }
 
+
+    // endpoint for setting both motor speed
+    //  input : SETSPEED/...
+    //          value between 0 and 1023
     if (command.startsWith("SETSPEED/"))
     {
-      int value =  command.substring(command.indexOf("/") + 1).toInt(); // splits het commando op na de / om de parameter in te lezen.
+      float value =  command.substring(command.indexOf("/") + 1).toFloat(); // splits het commando op na de / om de parameter in te lezen.
       RIGHTSPEED = value;
       LEFTSPEED = value;
       motorSet();
@@ -314,21 +314,39 @@ void loop()
     //  input : AIM/
     if (command.startsWith("AIM/"))
     {
-      aim(-1000, 30);
+      if (TOGGLEMODE == true)
+      {
+        aim(-1000, 12);
+      }
+      else
+      {
+        aim(3, -1000);
+      }
     }
 
     // endpoint for shooting one projectile (used for testing purposes)
     //  input : SHOOT/
     if (command.startsWith("SHOOT/"))
     {
-      if (TOGGLEMODE)
+      if (TOGGLEMODE == true)
       {
         shoot(-1000, 12);
       }
       else
       {
-        shoot(5, -1000);
+        shoot(2, -1000);
       }
+    }
+
+    // endpoint for receiving velocity information
+    //  input : MEASUREDSPEED/
+    //          value is a float representing the velocity in [m/s]
+    if (command.startsWith("MEASUREDSPEED/"))
+    {
+      MEASUREDSPEED = command.substring(command.indexOf("/") + 1).toFloat(); // splits het commando op na de / om de parameter in te lezen.
+      Serial.print(F("Received speed : "));
+      Serial.println(MEASUREDSPEED);
+      sendDetails();
     }
 
     // endpoint for resetting amount of balls (drum gets reloaded)
@@ -365,8 +383,11 @@ void loop()
         bluetoothSerial.println(0);
 
       }
-      TOGGLEMODE = true;
-      bluetoothSerial.println(1);
+      else
+      {
+        TOGGLEMODE = true;
+        bluetoothSerial.println(1);
+      }
 
       Serial.print(F("Switched mode to "));
       Serial.println(TOGGLEMODE);
@@ -379,38 +400,50 @@ void loop()
       calibration();
     }
 
+    // endpoint for receiving mechanical limit information
+    //  input : GETENDSTOPS/
     if (command.startsWith("GETENDSTOPS/"))
     {
       String endstops = String(ROTATION_START) + "," +  String(ROTATION_HOME) + "," + String(ROTATION_END) + ","
                 + String(ELEVATION_START) + "," + String(ELEVATION_HOME) + "," + String(ELEVATION_END) + ","
-                + String(RELOAD_START) + "," + String(RELOAD_HOME) + "," + String(RELOAD_END);
+                + String(RELOAD_END) + "," + String(RELOAD_HOME) + "," + String(RELOAD_HOME);
       Serial.println(endstops);
       bluetoothSerial.println(endstops);
     }
 
+    // endpoint for receiving selected training program information
     if (command.startsWith("GETTRAININGDETAILS/"))
     {
-      String info = String(DIFFICULTY) + "," +  String(MAX_AMMOUNT_OF_BALLS) + ","
-                + String(CURRENT_AMMOUNT_OF_BALLS) + "," + String(trajArray[2]);
-      Serial.println(info);
-      bluetoothSerial.println(info);
+      sendDetails();
     }
+
 
     command = "";  // cleaning input stream
   }
+
 
   // main pipeline
   if (fireFlag == true)
   {
     if (CURRENT_AMMOUNT_OF_BALLS != 0)
     {
+      //speedMeasure();
+
       gradientSet();
       //HOMEPOSX[0] = random(HOMEPOSX[1], HOMEPOSX[2]);  // not used -> PPP unable to move
       //HOMEPOSY[0] = random(HOMEPOSY[1], HOMEPOSY[2]);
 
       // random target location
-      TARGETX[0] = random(TARGETX[1], TARGETX[2]);
-      TARGETY[0] = random(TARGETY[1], TARGETY[2]);
+      TARGETX[0] = float(random(0, TARGETX[2]*2))/10 - 0.5;
+      TARGETY[0] = random(TARGETY[1], TARGETY[2])/10;
+
+      Serial.print("target-x: ");
+      Serial.println(TARGETX[0]);
+      Serial.print("target-y: ");
+      Serial.println(TARGETY[0]);
+      Serial.println(TARGETX[1]);
+      Serial.println(TARGETX[2]);
+
       // random reload speed
       RELOAD_SPEED[0] = random(RELOAD_SPEED[1], RELOAD_SPEED[2]);
 
@@ -429,10 +462,6 @@ void loop()
       Serial.print(F("Balls remaining : "));
       Serial.println(CURRENT_AMMOUNT_OF_BALLS);
 
-      String info = String(DIFFICULTY) + "," +  String(MAX_AMMOUNT_OF_BALLS) + ","
-                    + String(CURRENT_AMMOUNT_OF_BALLS) + "," + String(trajArray[2]);;
-      Serial.println(info);
-      bluetoothSerial.println(info);
     }
     else
     {
@@ -446,6 +475,8 @@ void loop()
 ////////////////////////////////////////////////////////////////////////////////
 //        Functies                                                            //
 ////////////////////////////////////////////////////////////////////////////////
+
+
 
 
 /**
@@ -482,6 +513,14 @@ void hardwareSetup()
   servoSet(ELEVATION_PIN, ELEVATION_HOME);
   delay(10);
 
+  Serial.println(F("        Shutting down servo..."));
+  LEFTSPEED = 0;
+  RIGHTSPEED = 0;
+
+  motorSet();
+  difSet(0);
+  delay(10);
+
   Serial.println(F("    Preperation Done!"));
 }
 
@@ -509,10 +548,11 @@ void difSet(int value)
     RELOAD_SPEED[1] = 4000;  // min
     RELOAD_SPEED[2] = 4000;  // max
     MAX_AMMOUNT_OF_BALLS = 5;
+    CURRENT_AMMOUNT_OF_BALLS = 5;
     TARGETX[1] = 0;  // left
     TARGETX[2] = 0;  // right
-    TARGETY[1] = 2.6;  // down
-    TARGETY[2] = 2.6;  // up
+    TARGETY[1] = 26;  // down
+    TARGETY[2] = 26;  // up
     SPINPERCENTAGE[1] = 0;  // min
     SPINPERCENTAGE[2] = 0;  // max
   }
@@ -524,10 +564,11 @@ void difSet(int value)
     RELOAD_SPEED[1] = 2000;  // min
     RELOAD_SPEED[2] = 4000;  // max
     MAX_AMMOUNT_OF_BALLS = 10;
+    CURRENT_AMMOUNT_OF_BALLS = 10;
     TARGETX[1] = 0;  // left
     TARGETX[2] = 0;  // right
-    TARGETY[1] = 2;  // down
-    TARGETY[2] = 2.6;  // up
+    TARGETY[1] = 22;  // down
+    TARGETY[2] = 26;  // up
     SPINPERCENTAGE[1] = 0;  // min
     SPINPERCENTAGE[2] = 0;  // max
   }
@@ -539,10 +580,11 @@ void difSet(int value)
     RELOAD_SPEED[1] = 1000;  // min
     RELOAD_SPEED[2] = 4000;  // max
     MAX_AMMOUNT_OF_BALLS = 10;
-    TARGETX[1] = -80;  // left
-    TARGETX[2] = 80;  // right
-    TARGETY[1] = 2;  // down
-    TARGETY[2] = 2.6;  // up
+    CURRENT_AMMOUNT_OF_BALLS = 10;
+    TARGETX[1] = -5;  // left
+    TARGETX[2] = 5;  // right
+    TARGETY[1] = 22;  // down
+    TARGETY[2] = 26;  // up
     SPINPERCENTAGE[1] = 0;  // min
     SPINPERCENTAGE[2] = 0;  // max
   }
@@ -554,12 +596,13 @@ void difSet(int value)
     RELOAD_SPEED[1] = 1000;  // min
     RELOAD_SPEED[2] = 2000;  // max
     MAX_AMMOUNT_OF_BALLS = 10;
-    TARGETX[1] = -80;  // left
-    TARGETX[2] = 80;  // right
-    TARGETY[1] = 2;  // down
-    TARGETY[2] = 2.6;  // up
-    SPINPERCENTAGE[1] = -0.2;  // min
-    SPINPERCENTAGE[2] = 0.2;  // max
+    CURRENT_AMMOUNT_OF_BALLS = 10;
+    TARGETX[1] = -5;  // left
+    TARGETX[2] = 5;  // right
+    TARGETY[1] = 22;  // down
+    TARGETY[2] = 26;  // up
+    SPINPERCENTAGE[1] = -4;  // min
+    SPINPERCENTAGE[2] = 4;  // max
   }
 }
 
@@ -673,9 +716,10 @@ void aim(float speed, float angle)
 
   // moving in position
   servoSet(ELEVATION_PIN, -elevation_angle);
-  servoSet(ROTATION_PIN, rotation_angle);
+  servoSet(ROTATION_PIN, -rotation_angle*0.5);
   LEFTSPEED = (1 + SPINPERCENTAGE[0])*motor_speed;
   RIGHTSPEED = (1 - SPINPERCENTAGE[0])*motor_speed;
+  motorSet();
 }
 
 /**
@@ -688,22 +732,80 @@ void shoot(float speed, float angle)
 {
   aim(speed, angle);
   motorSet();
-  delay(500);
+  delay(1500);
 
   Reload("OPEN");
   Serial.print(F("Reload Delay = "));
   Serial.println(RELOAD_SPEED[0]);
   delay(RELOAD_SPEED[0]);
   Reload("CLOSE");
-  float measured_speed = 3;//speed();
-  bluetoothSerial.println("speed/" + String(measured_speed));
 
+  //bluetoothSerial.println("speed/" + String(MEASUREDSPEED));
   delay(1000);
+  sendDetails();
 
   // stopping motors
   //LEFTSPEED = 0;
   //RIGHTSPEED = 0;
   //motorSet();
+}
+
+/**
+  Functie voor het ontvangen van snelheids data over serial verbinding.
+  Stuurt details door over bluetooth naar de app.
+
+  @return None
+*/
+void speedMeasure()
+{
+  Serial.println(F("Interrupt triggered!"));
+  delay(200);
+
+  command = "";
+  while (bluetoothSerial.available())
+  {
+    delay(10);
+    char c = bluetoothSerial.read();
+    command += c; // voeg karakter c toe aan command string totdat alle verzonden karakters via bluetoothSerial opgeslagen zijn in command
+  }
+
+  Serial.println(command);
+  //bluetoothSerial.println(command);
+  MEASUREDSPEED = command.toFloat();
+  //sendDetails();
+
+  /*
+  if (command.startsWith("MEASUREDSPEED/"))
+  {
+    MEASUREDSPEED = command.substring(command.indexOf("/") + 1).toFloat(); // splits het commando op na de / om de parameter in te lezen.
+    Serial.print(F("Received speed : "));
+    Serial.println(MEASUREDSPEED);
+    sendDetails();
+  }
+  */
+  delay(100);
+
+}
+
+
+/**
+  Functie voor het verzenden van momentele status over bluetooth naar app.
+
+  @return None
+*/
+void sendDetails()
+{
+  String info = String(DIFFICULTY) + "," +  String(MAX_AMMOUNT_OF_BALLS) + ","
+            + String(CURRENT_AMMOUNT_OF_BALLS) + "," + String(trajArray[2]*3)
+            + "," + String(MEASUREDSPEED);
+  Serial.println(F("Sending current status ..."));
+  Serial.println(info);
+  bluetoothSerial.println(info);
+  digitalWrite(interruptPin, LOW);
+  delay(100);
+  digitalWrite(interruptPin, HIGH);
+
+
 }
 
 /**
@@ -717,6 +819,45 @@ void shoot(float speed, float angle)
 */
 void servoSet(int servoPin, float servoAngle)
 {
+  if (servoPin == RELOAD_PIN)
+  {
+    if ((servoAngle < RELOAD_END) or (RELOAD_START < servoAngle))
+    {
+      Serial.print(F("Reload angle to large! -> "));
+      Serial.println(servoAngle);
+      ledSet("RED", 1);
+      delay(1000);
+      ledSet("RED", 0);
+      return;
+    }
+  }
+
+  if (servoPin == ROTATION_PIN)
+  {
+    if ((servoAngle < ROTATION_START) or (ROTATION_END < servoAngle))
+    {
+      Serial.println(F("Rotation angle to large! -> "));
+      Serial.println(servoAngle);
+      ledSet("RED", 1);
+      delay(1000);
+      ledSet("RED", 0);
+      return;
+    }
+  }
+
+  if (servoPin == ELEVATION_PIN)
+  {
+    if ((servoAngle < ELEVATION_START) or (ELEVATION_END < servoAngle))
+    {
+      Serial.println(F("Elevation angle to large! -> "));
+      Serial.println(servoAngle);
+      ledSet("RED", 1);
+      delay(1000);
+      ledSet("RED", 0);
+      return;
+    }
+  }
+
   Serial.println(F("Setting servo to angle ..."));
   Serial.print(F("        servoPin = "));
   Serial.println(servoPin);
@@ -749,9 +890,9 @@ void motorSet()
 {
   Serial.println(F("Running DC-motors up to speed ..."));
   Serial.print(F("        Left motor: "));
-  Serial.println(LEFTSPEED);
+  Serial.println(LEFTSPEED*SPEEDFACTOR);
   Serial.print(F("        Right motor: "));
-  Serial.println(RIGHTSPEED);
+  Serial.println(RIGHTSPEED*SPEEDFACTOR);
   SoftPWMSet(PWM_M1_PIN, LEFTSPEED*SPEEDFACTOR);
   SoftPWMSet(PWM_M2_PIN, RIGHTSPEED*SPEEDFACTOR);
   Serial.println(F("    Done!"));
@@ -874,7 +1015,7 @@ void calTraj(float speed, float elevation_angle)
 
 float calAnglefromSpeed(float distance, float speed)
 {
-  float new_angle = (57.29577951*acos((0.9449649771*distance)/speed))*180/3.1415;
+  float new_angle = (57.29577951*acos((0.9449649771*distance)/speed));//*180/3.1415;
   return new_angle;
 }
 
